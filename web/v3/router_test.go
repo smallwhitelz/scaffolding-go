@@ -33,6 +33,26 @@ func TestRouter_AddRoute(t *testing.T) {
 			path:   "/order/detail",
 		},
 		{
+			method: http.MethodGet,
+			path:   "/order/*",
+		},
+		{
+			method: http.MethodGet,
+			path:   "/*",
+		},
+		{
+			method: http.MethodGet,
+			path:   "/*/*",
+		},
+		{
+			method: http.MethodGet,
+			path:   "/*/abc",
+		},
+		{
+			method: http.MethodGet,
+			path:   "/*/abc/*",
+		},
+		{
 			method: http.MethodPost,
 			path:   "/order/create",
 		},
@@ -40,15 +60,6 @@ func TestRouter_AddRoute(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/login",
 		},
-		// 以下是一些不合法的路由，暂时先不测试
-		//{
-		//	method: http.MethodPost,
-		//	path:   "login",
-		//},
-		//{
-		//	method: http.MethodPost,
-		//	path:   "login////",
-		//},
 	}
 
 	var mockHandler HandleFunc = func(ctx *Context) {}
@@ -81,6 +92,10 @@ func TestRouter_AddRoute(t *testing.T) {
 								path:    "detail",
 								handler: mockHandler,
 							},
+						},
+						starChild: &node{
+							path:    "*",
+							handler: mockHandler,
 						},
 					},
 				},
@@ -165,6 +180,12 @@ func (n *node) equal(y *node) (string, bool) {
 	if len(n.children) != len(y.children) {
 		return fmt.Sprintf("节点 %s 的 children 长度不相等，want=%d, got=%d", n.path, len(n.children), len(y.children)), false
 	}
+	if n.starChild != nil {
+		msg, ok := n.starChild.equal(y.starChild)
+		if !ok {
+			return msg, ok
+		}
+	}
 	// 比较handler
 	nHandler := reflect.ValueOf(n.handler)
 	yHandler := reflect.ValueOf(y.handler)
@@ -210,6 +231,10 @@ func TestRouter_findRoute(t *testing.T) {
 			path:   "/order/detail",
 		},
 		{
+			method: http.MethodGet,
+			path:   "/order/*",
+		},
+		{
 			method: http.MethodPost,
 			path:   "/order/create",
 		},
@@ -247,6 +272,17 @@ func TestRouter_findRoute(t *testing.T) {
 			wantFound: true,
 			wantNode: &node{
 				path:    "detail",
+				handler: mockHandler,
+			},
+		},
+		{
+			// 完全命中
+			name:      "order star",
+			method:    http.MethodGet,
+			path:      "/order/abc",
+			wantFound: true,
+			wantNode: &node{
+				path:    "*",
 				handler: mockHandler,
 			},
 		},

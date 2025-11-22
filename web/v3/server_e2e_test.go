@@ -24,8 +24,12 @@ func TestServer(t *testing.T) {
 	//
 	//})
 
-	h.addRoute(http.MethodGet, "/order/detail", func(ctx *Context) {
+	h.Get("/order/detail", func(ctx *Context) {
 		ctx.Resp.Write([]byte("hello world"))
+	})
+
+	h.Get("/order/abc", func(ctx *Context) {
+		ctx.Resp.Write([]byte(fmt.Sprintf("hello,%s", ctx.Req.URL.Path)))
 	})
 	// 方法一，完全委托给http包管理
 	//http.ListenAndServe(":8081", h)
