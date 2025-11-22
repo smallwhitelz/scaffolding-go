@@ -34,6 +34,10 @@ func TestRouter_AddRoute(t *testing.T) {
 		},
 		{
 			method: http.MethodGet,
+			path:   "/order/detail/:id",
+		},
+		{
+			method: http.MethodGet,
 			path:   "/order/*",
 		},
 		{
@@ -91,6 +95,10 @@ func TestRouter_AddRoute(t *testing.T) {
 							"detail": &node{
 								path:    "detail",
 								handler: mockHandler,
+								paramChild: &node{
+									path:    ":id",
+									handler: mockHandler,
+								},
 							},
 						},
 						starChild: &node{
@@ -155,6 +163,18 @@ func TestRouter_AddRoute(t *testing.T) {
 	// mockHandler 为 nil？要不要校验
 	// 不用 因为传了nil，相当于没注册，用户这样写没有意义
 	//r.addRoute("aaa", "/a/b/c", nil)
+
+	r = newRouter()
+	r.addRoute(http.MethodGet, "/a/*", mockHandler)
+	assert.Panicsf(t, func() {
+		r.addRoute(http.MethodGet, "/a/:id", mockHandler)
+	}, "web:不允许同时注册路径参数和通配符路由，已有通配符路由")
+
+	r = newRouter()
+	r.addRoute(http.MethodGet, "/a/:id", mockHandler)
+	assert.Panicsf(t, func() {
+		r.addRoute(http.MethodGet, "/a/*", mockHandler)
+	}, "web:不允许同时注册路径参数和通配符路由，已有路径参数")
 }
 
 // 返回一个错误信息，帮助我们排查问题
@@ -182,6 +202,12 @@ func (n *node) equal(y *node) (string, bool) {
 	}
 	if n.starChild != nil {
 		msg, ok := n.starChild.equal(y.starChild)
+		if !ok {
+			return msg, ok
+		}
+	}
+	if n.paramChild != nil {
+		msg, ok := n.paramChild.equal(y.paramChild)
 		if !ok {
 			return msg, ok
 		}
@@ -242,6 +268,10 @@ func TestRouter_findRoute(t *testing.T) {
 			method: http.MethodPost,
 			path:   "/login",
 		},
+		{
+			method: http.MethodPost,
+			path:   "/login/:username",
+		},
 	}
 	r := newRouter()
 	var mockHandler HandleFunc = func(ctx *Context) {}
@@ -255,7 +285,7 @@ func TestRouter_findRoute(t *testing.T) {
 		path   string
 
 		wantFound bool
-		wantNode  *node
+		info      *matchInfo
 	}{
 		{
 			// 方法都不存在
@@ -270,9 +300,11 @@ func TestRouter_findRoute(t *testing.T) {
 			method:    http.MethodGet,
 			path:      "/order/detail",
 			wantFound: true,
-			wantNode: &node{
-				path:    "detail",
-				handler: mockHandler,
+			info: &matchInfo{
+				n: &node{
+					path:    "detail",
+					handler: mockHandler,
+				},
 			},
 		},
 		{
@@ -281,9 +313,11 @@ func TestRouter_findRoute(t *testing.T) {
 			method:    http.MethodGet,
 			path:      "/order/abc",
 			wantFound: true,
-			wantNode: &node{
-				path:    "*",
-				handler: mockHandler,
+			info: &matchInfo{
+				n: &node{
+					path:    "*",
+					handler: mockHandler,
+				},
 			},
 		},
 		{
@@ -292,13 +326,15 @@ func TestRouter_findRoute(t *testing.T) {
 			method:    http.MethodGet,
 			path:      "/order",
 			wantFound: true,
-			wantNode: &node{
-				path: "order",
-				//handler: mockHandler,
-				children: map[string]*node{
-					"detail": &node{
-						path:    "detail",
-						handler: mockHandler,
+			info: &matchInfo{
+				n: &node{
+					path: "order",
+					//handler: mockHandler,
+					children: map[string]*node{
+						"detail": &node{
+							path:    "detail",
+							handler: mockHandler,
+						},
 					},
 				},
 			},
@@ -309,9 +345,27 @@ func TestRouter_findRoute(t *testing.T) {
 			method:    http.MethodDelete,
 			path:      "/",
 			wantFound: true,
-			wantNode: &node{
-				path:    "/",
-				handler: mockHandler,
+			info: &matchInfo{
+				n: &node{
+					path:    "/",
+					handler: mockHandler,
+				},
+			},
+		},
+		{
+			// username路径参数匹配
+			name:      "login username ",
+			method:    http.MethodPost,
+			path:      "/login/zl",
+			wantFound: true,
+			info: &matchInfo{
+				n: &node{
+					path:    ":username",
+					handler: mockHandler,
+				},
+				pathParams: map[string]string{
+					"username": "zl",
+				},
 			},
 		},
 
@@ -324,12 +378,13 @@ func TestRouter_findRoute(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			n, found := r.findRoute(tc.method, tc.path)
+			info, found := r.findRoute(tc.method, tc.path)
 			assert.Equal(t, tc.wantFound, found)
 			if !found {
 				return
 			}
-			msg, ok := tc.wantNode.equal(n)
+			assert.Equal(t, tc.info.pathParams, info.pathParams)
+			msg, ok := tc.info.n.equal(info.n)
 			assert.True(t, ok, msg)
 		})
 	}
