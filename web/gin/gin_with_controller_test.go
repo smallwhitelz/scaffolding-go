@@ -1,0 +1,22 @@
+package gin
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+)
+
+func TestUserController_GetUser(t *testing.T) {
+	g := gin.Default()
+	ctrl := &UserController{}
+	g.GET("/user", ctrl.GetUser)
+	g.POST("/user", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "hello %s", "world")
+	})
+	g.GET("/static", func(ctx *gin.Context) {
+		// 读文件
+		// 写响应
+	})
+	_ = g.Run(":8082")
+}
