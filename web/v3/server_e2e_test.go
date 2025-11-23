@@ -1,6 +1,6 @@
 //go:build e2e
 
-package v2
+package v3
 
 import (
 	"fmt"
