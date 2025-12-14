@@ -12,6 +12,7 @@ require (
 	github.com/kataras/iris/v12 v12.2.11
 	github.com/labstack/echo-contrib v0.17.4
 	github.com/labstack/echo/v4 v4.13.4
+	github.com/mattn/go-sqlite3 v1.14.27
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redis/go-redis/v9 v9.5.5
