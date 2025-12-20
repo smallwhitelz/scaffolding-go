@@ -33,3 +33,7 @@ func NewErrUnsupportedExpressionType(exp any) error {
 // @ErrUnsupportedExpressionType 40001
 // 发生该错误，主要是因为传入了不支持的 Expression 的实际类型
 // 一般来说，这是因为中间件
+
+func NewErrInvalidTagContent(pair string) error {
+	return fmt.Errorf("orm: 非法标签值 %s", pair)
+}
