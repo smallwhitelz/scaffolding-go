@@ -2,14 +2,15 @@ package orm
 
 import (
 	"context"
-	"reflect"
 	"scaffolding-go/orm/internal/errs"
+	"scaffolding-go/orm/model"
+
 	"strings"
 )
 
 type Selector[T any] struct {
 	table string
-	model *Model
+	model *model.Model
 	where []Predicate
 	sb    *strings.Builder
 	args  []any
@@ -37,7 +38,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	// 我怎么把表名拿到
 	if s.table == "" {
 		sb.WriteByte('`')
-		sb.WriteString(s.model.tableName)
+		sb.WriteString(s.model.TableName)
 		sb.WriteByte('`')
 	} else {
 		//segs := strings.Split(s.table, ".")
@@ -100,13 +101,13 @@ func (s *Selector[T]) buildExpression(expr Expression) error {
 		}
 
 	case Column:
-		fd, ok := s.model.fieldMap[exp.name]
+		fd, ok := s.model.FieldMap[exp.name]
 		// 字段不对，或者说列不对
 		if !ok {
 			return errs.NewErrUnknownField(exp.name)
 		}
 		s.sb.WriteByte('`')
-		s.sb.WriteString(fd.colName)
+		s.sb.WriteString(fd.ColName)
 		s.sb.WriteByte('`')
 		// 剩下不考虑
 	case value:
@@ -135,6 +136,57 @@ func (s *Selector[T]) Where(ps ...Predicate) *Selector[T] {
 	return s
 }
 
+//func (s *Selector[T]) GetV1(ctx context.Context) (*T, error) {
+//	q, err := s.Build()
+//	// 这个是构造sql失败
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	db := s.db.db
+//	// 在这里发起查询，并且处理结果集
+//	rows, err := db.QueryContext(ctx, q.SQL, q.Args...)
+//	// 这个是查询的错误
+//	if err != nil {
+//		return nil, err
+//	}
+//	// 你要确认有没有数据
+//	if !rows.Next() {
+//		// 要不要返回error?
+//		// 返回error 和 sql包语义保持一致
+//		return nil, ErrNoRows
+//	}
+//	// 在这里继续处理结果集
+//	// 我怎么知道你 SELECT 出来了那些列
+//	// 拿到了 SELECT 出来的列
+//	cs, err := rows.Columns()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	var vals []any
+//	tp := new(T)
+//	// 起始地址
+//	address := reflect.ValueOf(tp).UnsafePointer()
+//	for _, c := range cs {
+//		// c 是列名
+//		fd, ok := s.model.ColumnMap[c]
+//		if !ok {
+//			return nil, errs.NewErrUnknownColumn(c)
+//		}
+//		// 是不是要计算字段的地址?
+//		// 起始地址 + 偏移量
+//		fdAddress := unsafe.Pointer(uintptr(address) + fd.Offset)
+//		// 反射在特定的地址上，创建一个特定类型的实例
+//		// 这里创建的实例是原本类型的指针类型
+//		// 例如 fd.Type = int 那么val 就是 *int
+//		val := reflect.NewAt(fd.Typ, fdAddress)
+//		vals = append(vals, val.Interface())
+//	}
+//	err = rows.Scan(vals...)
+//	return tp, err
+//}
+
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	q, err := s.Build()
 	// 这个是构造sql失败
@@ -155,52 +207,14 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 		// 返回error 和 sql包语义保持一致
 		return nil, ErrNoRows
 	}
-	// 在这里继续处理结果集
-	// 我怎么知道你 SELECT 出来了那些列
-	// 拿到了 SELECT 出来的列
-	cs, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-
-	// 怎么利用cs解决顺序问题和类型问题
 
 	tp := new(T)
-	// 通过cs来构造 vals
-	vals := make([]any, 0, len(cs))
-	valElems := make([]reflect.Value, 0, len(cs))
-	for _, c := range cs {
-		// c 是列名
-		fd, ok := s.model.columnMap[c]
-		if !ok {
-			return nil, errs.NewErrUnknownColumn(c)
-		}
-		// 反射创建一个实例
-		// 这里创建的实例是原本类型的指针类型
-		// 例如 fd.Type = int 那么val 就是 *int
-		val := reflect.New(fd.typ)
-		vals = append(vals, val.Interface())
-		// 记得要调用Elem 因为fd.Type = int 那么val 就是 *int
-		valElems = append(valElems, val.Elem())
-	}
-	// 第一个问题：类型要匹配
-	// 第二个问题：顺序要匹配
-
-	// SELECT id, first_name,age,last_name
-	err = rows.Scan(vals...)
-	if err != nil {
-		return nil, err
-	}
-	// 想办法把 vals塞进去 结果 tp 里面
-	tpValue := reflect.ValueOf(tp)
-	for i, c := range cs {
-		fd, ok := s.model.columnMap[c]
-		if !ok {
-			return nil, errs.NewErrUnknownColumn(c)
-		}
-		tpValue.Elem().FieldByName(fd.goName).Set(valElems[i])
-	}
+	val := s.db.creator(s.model, tp)
+	err = val.SetColumns(rows)
+	// 接口定义好后就两件事，一个是用新接口的方法改造上层，
+	// 一个就是提供不同的实现
 	return tp, err
+
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {

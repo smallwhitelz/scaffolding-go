@@ -1,4 +1,4 @@
-package orm
+package model
 
 import (
 	"errors"
@@ -15,26 +15,29 @@ const (
 
 type Registry interface {
 	Get(val any) (*Model, error)
-	Register(val any, opts ...ModeOpt) (*Model, error)
+	Register(val any, opts ...Option) (*Model, error)
 }
 
 type Model struct {
-	tableName string
+	TableName string
 	// 字段名到字段定义的映射
-	fieldMap map[string]*Field
+	FieldMap map[string]*Field
 	// 列名到字段定义的映射
-	columnMap map[string]*Field
+	ColumnMap map[string]*Field
 }
 
-type ModeOpt func(m *Model) error
+type Option func(m *Model) error
 
 type Field struct {
 	// 字段名
-	goName string
+	GoName string
 	// 列名
-	colName string
+	ColName string
 	// 代表的是字段的类型
-	typ reflect.Type
+	Typ reflect.Type
+
+	// 字段相对于结构体本身的偏移量
+	Offset uintptr
 }
 
 //var models = map[reflect.Type]*Model{}
@@ -50,7 +53,7 @@ type registry struct {
 	models sync.Map
 }
 
-func newRegistry() *registry {
+func NewRegistry() Registry {
 	return &registry{}
 }
 
@@ -94,7 +97,7 @@ func (r *registry) Get(val any) (*Model, error) {
 //}
 
 // Register 限制只能用一级指针
-func (r *registry) Register(entity any, opts ...ModeOpt) (*Model, error) {
+func (r *registry) Register(entity any, opts ...Option) (*Model, error) {
 	typ := reflect.TypeOf(entity)
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Struct {
 		return nil, errors.New("orm: 只支持指向结构体的一级指针")
@@ -115,10 +118,11 @@ func (r *registry) Register(entity any, opts ...ModeOpt) (*Model, error) {
 			colName = underscoreName(fd.Name)
 		}
 		fdMeta := &Field{
-			goName:  fd.Name,
-			colName: colName,
+			GoName:  fd.Name,
+			ColName: colName,
 			// 字段类型
-			typ: fd.Type,
+			Typ:    fd.Type,
+			Offset: fd.Offset,
 		}
 		fieldMap[fd.Name] = fdMeta
 		columnMap[colName] = fdMeta
@@ -132,9 +136,9 @@ func (r *registry) Register(entity any, opts ...ModeOpt) (*Model, error) {
 		tableName = underscoreName(elemType.Name())
 	}
 	res := &Model{
-		tableName: tableName,
-		fieldMap:  fieldMap,
-		columnMap: columnMap,
+		TableName: tableName,
+		FieldMap:  fieldMap,
+		ColumnMap: columnMap,
 	}
 	for _, opt := range opts {
 		err := opt(res)
@@ -146,9 +150,9 @@ func (r *registry) Register(entity any, opts ...ModeOpt) (*Model, error) {
 	return res, nil
 }
 
-func ModelWithTableName(tableName string) ModeOpt {
+func WithTableName(tableName string) Option {
 	return func(m *Model) error {
-		m.tableName = tableName
+		m.TableName = tableName
 		//if tableName == "" {
 		//	return err
 		//}
@@ -156,13 +160,13 @@ func ModelWithTableName(tableName string) ModeOpt {
 	}
 }
 
-func ModelWithColumnName(field string, colName string) ModeOpt {
+func WithColumnName(field string, colName string) Option {
 	return func(m *Model) error {
-		fd, ok := m.fieldMap[field]
+		fd, ok := m.FieldMap[field]
 		if !ok {
 			return errs.NewErrUnknownField(field)
 		}
-		fd.colName = colName
+		fd.ColName = colName
 		return nil
 	}
 }
@@ -205,4 +209,8 @@ func underscoreName(tableName string) string {
 
 	}
 	return string(buf)
+}
+
+type TableName interface {
+	TableName() string
 }
