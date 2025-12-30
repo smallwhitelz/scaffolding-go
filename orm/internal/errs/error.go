@@ -13,6 +13,9 @@ var (
 	ErrPointerOnly = errors.New("orm: 只支持指向结构体的一级指针")
 
 	ErrNoRows = errors.New("orm: 没有数据")
+
+	// ErrInsertZeroRow 代表插入 0 行
+	ErrInsertZeroRow = errors.New("orm: 插入 0 行")
 )
 
 // NewErrUnknownField 返回代表未知字段的错误
@@ -42,4 +45,8 @@ func NewErrUnsupportedExpressionType(exp any) error {
 
 func NewErrInvalidTagContent(pair string) error {
 	return fmt.Errorf("orm: 非法标签值 %s", pair)
+}
+
+func NewErrUnsupportedAssignable(expr any) error {
+	return fmt.Errorf("orm: 不支持的赋值表达式类型 %v", expr)
 }
