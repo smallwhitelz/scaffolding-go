@@ -36,38 +36,6 @@ type Predicate struct {
 //	}
 //}
 
-type Column struct {
-	name string
-}
-
-func C(name string) Column {
-	return Column{
-		name: name,
-	}
-}
-
-// C("id").Eq(12)
-// sub.C("id").Eq(12) 复杂查询，可读性高
-func (c Column) Eq(arg any) Predicate {
-	return Predicate{
-		left:  c,
-		op:    opEq,
-		right: value{val: arg},
-	}
-}
-
-func (c Column) LT(arg any) Predicate {
-	return Predicate{
-		left:  c,
-		op:    opLT,
-		right: value{val: arg},
-	}
-}
-
-func (c Column) expr() {
-
-}
-
 // Not(C("name").Eq("Tom"))
 func Not(p Predicate) Predicate {
 	return Predicate{
@@ -105,9 +73,4 @@ type value struct {
 
 func (value) expr() {
 
-}
-
-// Expression 是一个标记接口，代表表达式
-type Expression interface {
-	expr()
 }
