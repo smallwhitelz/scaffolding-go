@@ -24,6 +24,21 @@ func NewUnsafeValue(model *model.Model, val any) Value {
 	}
 }
 
+func (r unsafeValue) Field(name string) (any, error) {
+	fd, ok := r.model.FieldMap[name]
+	if !ok {
+		return nil, errs.NewErrUnknownField(name)
+	}
+	// 是不是要计算字段的地址?
+	// 起始地址 + 偏移量
+	fdAddress := unsafe.Pointer(uintptr(r.address) + fd.Offset)
+	// 反射在特定的地址上，创建一个特定类型的实例
+	// 这里创建的实例是原本类型的指针类型
+	// 例如 fd.Type = int 那么val 就是 *int
+	val := reflect.NewAt(fd.Typ, fdAddress)
+	return val.Elem().Interface(), nil
+}
+
 func (r unsafeValue) SetColumns(rows *sql.Rows) error {
 	// 我怎么知道你 SELECT 出来了那些列
 	// 拿到了 SELECT 出来的列

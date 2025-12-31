@@ -10,7 +10,7 @@ import (
 type reflectValue struct {
 	model *model.Model
 	// 对应于 T 的指针
-	val any
+	val reflect.Value
 }
 
 var _ Creator = NewReflectValue
@@ -18,8 +18,12 @@ var _ Creator = NewReflectValue
 func NewReflectValue(model *model.Model, val any) Value {
 	return reflectValue{
 		model: model,
-		val:   val,
+		val:   reflect.ValueOf(val).Elem(),
 	}
+}
+
+func (r reflectValue) Field(name string) (any, error) {
+	return r.val.FieldByName(name).Interface(), nil
 }
 
 func (r reflectValue) SetColumns(rows *sql.Rows) error {
@@ -58,7 +62,7 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 		return err
 	}
 	// 想办法把 vals塞进去 结果 tp 里面
-	tpValue := reflect.ValueOf(r.val)
+	tpValue := r.val
 	for i, c := range cs {
 		fd, ok := r.model.ColumnMap[c]
 		if !ok {

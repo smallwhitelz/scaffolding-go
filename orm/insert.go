@@ -1,7 +1,7 @@
 package orm
 
 import (
-	"reflect"
+	"context"
 	"scaffolding-go/orm/internal/errs"
 	"scaffolding-go/orm/model"
 )
@@ -116,18 +116,22 @@ func (i *Inserter[T]) Build() (*Query, error) {
 
 	// 预估参数数量是：我有多少行乘以我有多少个字段
 	i.args = make([]any, 0, len(i.values)*len(fields))
-	for j, val := range i.values {
+	for j, v := range i.values {
 		if j > 0 {
 			i.sb.WriteByte(',')
 		}
 		i.sb.WriteByte('(')
+		val := i.db.creator(i.model, v)
 		for idx, field := range fields {
 			if idx > 0 {
 				i.sb.WriteByte(',')
 			}
 			i.sb.WriteString("?")
 			// 把参数读出来
-			arg := reflect.ValueOf(val).Elem().FieldByName(field.GoName).Interface()
+			arg, err := val.Field(field.GoName)
+			if err != nil {
+				return nil, err
+			}
 			i.addArg(arg)
 		}
 		i.sb.WriteByte(')')
@@ -140,4 +144,15 @@ func (i *Inserter[T]) Build() (*Query, error) {
 	}
 	i.sb.WriteByte(';')
 	return &Query{SQL: i.sb.String(), Args: i.args}, nil
+}
+
+func (i *Inserter[T]) Exec(ctx context.Context) Result {
+	q, err := i.Build()
+	if err != nil {
+		return Result{
+			err: err,
+		}
+	}
+	res, err := i.db.db.Exec(q.SQL, q.Args...)
+	return Result{err: err, res: res}
 }
