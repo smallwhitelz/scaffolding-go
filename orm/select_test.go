@@ -251,10 +251,10 @@ func TestSelector_Build(t *testing.T) {
 }
 
 // memoryDB 返回一个基于内存的 ORM，它使用的是 sqlite3 内存模式。
-func memoryDB(t *testing.T) *DB {
+func memoryDB(t *testing.T, opts ...DBOption) *DB {
 	orm, err := Open("sqlite3", "file:test.db?cache=shared&mode=memory",
 		// 仅仅用于单元测试，不会发起真的查询
-		DBWithDialect(DialectMySQL))
+		opts...)
 	if err != nil {
 		t.Fatal(err)
 	}

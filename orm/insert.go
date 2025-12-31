@@ -6,17 +6,25 @@ import (
 	"scaffolding-go/orm/model"
 )
 
-type OnDuplicateKeyBuilder[T any] struct {
-	i *Inserter[T]
+type UpsertBuilder[T any] struct {
+	i               *Inserter[T]
+	conflictColumns []string
 }
 
-type OnDuplicateKey struct {
-	assigns []Assignable
+type Upsert struct {
+	assigns         []Assignable
+	conflictColumns []string
 }
 
-func (o *OnDuplicateKeyBuilder[T]) Update(assigns ...Assignable) *Inserter[T] {
-	o.i.onDuplicateKey = &OnDuplicateKey{
-		assigns: assigns,
+func (o *UpsertBuilder[T]) ConflictColumns(cols ...string) *UpsertBuilder[T] {
+	o.conflictColumns = cols
+	return o
+}
+
+func (o *UpsertBuilder[T]) Update(assigns ...Assignable) *Inserter[T] {
+	o.i.onDuplicateKey = &Upsert{
+		assigns:         assigns,
+		conflictColumns: o.conflictColumns,
 	}
 	return o.i
 }
@@ -31,7 +39,7 @@ type Inserter[T any] struct {
 	db      *DB
 	columns []string
 	//onDuplicateKey []Assignable
-	onDuplicateKey *OnDuplicateKey
+	onDuplicateKey *Upsert
 }
 
 func NewInserter[T any](db *DB) *Inserter[T] {
@@ -44,13 +52,13 @@ func NewInserter[T any](db *DB) *Inserter[T] {
 	}
 }
 
-//func (i *Inserter[T]) OnDuplicateKey(assigns ...Assignable) *Inserter[T] {
+//func (i *Inserter[T]) Upsert(assigns ...Assignable) *Inserter[T] {
 //	i.onDuplicateKey = assigns
 //	return i
 //}
 
-func (i *Inserter[T]) OnDuplicateKey() *OnDuplicateKeyBuilder[T] {
-	return &OnDuplicateKeyBuilder[T]{
+func (i *Inserter[T]) OnDuplicateKey() *UpsertBuilder[T] {
+	return &UpsertBuilder[T]{
 		i: i,
 	}
 }
@@ -125,7 +133,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 		i.sb.WriteByte(')')
 	}
 	if i.onDuplicateKey != nil {
-		err := i.dialect.buildOnDuplicateKey(&i.builder, i.onDuplicateKey)
+		err := i.dialect.buildUpsert(&i.builder, i.onDuplicateKey)
 		if err != nil {
 			return nil, err
 		}

@@ -8,6 +8,74 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestInsert_SQLite_upsert(t *testing.T) {
+	db := memoryDB(t, DBWithDialect(DialectSQLite))
+	testCases := []struct {
+		name string
+		i    QueryBuilder
+
+		wantErr   error
+		wantQuery *Query
+	}{
+		{
+			name: "upsert-update value",
+			i: NewInserter[TestModel](db).Values(&TestModel{
+				Id:        12,
+				FirstName: "Tom",
+				Age:       18,
+				LastName: &sql.NullString{
+					String: "Jerry",
+					Valid:  true,
+				},
+			}).OnDuplicateKey().ConflictColumns("Id").Update(Assign("FirstName", "Bob"), Assign("Age", 19)),
+			wantQuery: &Query{
+				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES (?,?,?,?)" +
+					" ON CONFLICT(`id`) DO UPDATE SET `first_name`=?,`age`=?;",
+				Args: []any{int64(12), "Tom", int8(18), &sql.NullString{
+					String: "Jerry",
+					Valid:  true,
+				}, "Bob", 19},
+			},
+		},
+		{
+			name: "upsert-update column",
+			i: NewInserter[TestModel](db).Values(&TestModel{
+				Id:        12,
+				FirstName: "Tom",
+				Age:       18,
+				LastName: &sql.NullString{
+					String: "Jerry",
+					Valid:  true,
+				},
+			}, &TestModel{
+				Id:        13,
+				FirstName: "Bob",
+				Age:       10,
+				LastName: &sql.NullString{
+					String: "Allice",
+					Valid:  true,
+				},
+			}).OnDuplicateKey().ConflictColumns("FirstName", "LastName").Update(C("FirstName"), C("Age")),
+			wantQuery: &Query{
+				SQL: "INSERT INTO `test_model`(`id`,`first_name`,`age`,`last_name`) VALUES (?,?,?,?),(?,?,?,?)" +
+					" ON CONFLICT(`first_name`,`last_name`) DO UPDATE SET `first_name`=excluded.`first_name`,`age`=excluded.`age`;",
+				Args: []any{int64(12), "Tom", int8(18), &sql.NullString{String: "Jerry", Valid: true},
+					int64(13), "Bob", int8(10), &sql.NullString{String: "Allice", Valid: true}},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := tc.i.Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, q)
+		})
+	}
+}
+
 func TestInserter_Build(t *testing.T) {
 	db := memoryDB(t)
 	testCases := []struct {
