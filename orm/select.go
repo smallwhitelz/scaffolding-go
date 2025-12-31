@@ -16,7 +16,9 @@ type Selector[T any] struct {
 	builder
 	table   string
 	where   []Predicate
+	having  []Predicate
 	columns []Selectable
+	groupBy []Column
 	// 可以放r、也可以直接放db
 	db *DB
 	//r *registry
@@ -67,6 +69,17 @@ func (s *Selector[T]) Build() (*Query, error) {
 		}
 		if err := s.buildExpression(p); err != nil {
 			return nil, err
+		}
+	}
+	if len(s.groupBy) > 0 {
+		s.sb.WriteString(" GROUP BY ")
+		for i, c := range s.groupBy {
+			if i > 0 {
+				s.sb.WriteByte(',')
+			}
+			if err := s.buildColumn(c); err != nil {
+				return nil, err
+			}
 		}
 	}
 	s.sb.WriteByte(';')
@@ -168,14 +181,10 @@ func (s *Selector[T]) buildColumns() error {
 }
 
 func (s *Selector[T]) buildColumn(col Column) error {
-	fd, ok := s.model.FieldMap[col.name]
-	// 字段不对，或者说列不对
-	if !ok {
-		return errs.NewErrUnknownField(col.name)
+	err := s.builder.buildColumn(col.name)
+	if err != nil {
+		return err
 	}
-	s.sb.WriteByte('`')
-	s.sb.WriteString(fd.ColName)
-	s.sb.WriteByte('`')
 	if col.alias != "" {
 		s.sb.WriteString(" AS `")
 		s.sb.WriteString(col.alias)
@@ -212,6 +221,16 @@ func (s *Selector[T]) FROM(table string) *Selector[T] {
 
 func (s *Selector[T]) Where(ps ...Predicate) *Selector[T] {
 	s.where = ps
+	return s
+}
+
+func (s *Selector[T]) GroupBy(cols ...Column) *Selector[T] {
+	s.groupBy = cols
+	return s
+}
+
+func (s *Selector[T]) Having(ps ...Predicate) *Selector[T] {
+	s.having = ps
 	return s
 }
 

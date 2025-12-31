@@ -15,6 +15,57 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSelector_GroupBy(t *testing.T) {
+	db := memoryDB(t)
+	testCases := []struct {
+		name      string
+		q         QueryBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			// 调用了，但是啥也没传
+			name: "none",
+			q:    NewSelector[TestModel](db).GroupBy(),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model`;",
+			},
+		},
+		{
+			// 单个
+			name: "single",
+			q:    NewSelector[TestModel](db).GroupBy(C("Age")),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model` GROUP BY `age`;",
+			},
+		},
+		{
+			// 多个
+			name: "multiple",
+			q:    NewSelector[TestModel](db).GroupBy(C("Age"), C("FirstName")),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model` GROUP BY `age`,`first_name`;",
+			},
+		},
+		{
+			// 不存在
+			name:    "invalid column",
+			q:       NewSelector[TestModel](db).GroupBy(C("Invalid")),
+			wantErr: errs.NewErrUnknownField("Invalid"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			query, err := tc.q.Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, query)
+		})
+	}
+}
+
 func TestSelector_Select(t *testing.T) {
 	db := memoryDB(t)
 	testCases := []struct {
