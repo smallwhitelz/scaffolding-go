@@ -19,24 +19,23 @@ type Selector[T any] struct {
 	having  []Predicate
 	columns []Selectable
 	groupBy []Column
-	// 可以放r、也可以直接放db
-	db *DB
-	//r *registry
+	sess    Session
 }
 
-func NewSelector[T any](db *DB) *Selector[T] {
+func NewSelector[T any](sess Session) *Selector[T] {
+	c := sess.getCore()
 	return &Selector[T]{
 		builder: builder{
-			dialect: db.dialect,
-			quoter:  db.dialect.quoter(),
+			core:   c,
+			quoter: c.dialect.quoter(),
 		},
-		db: db,
+		sess: sess,
 	}
 }
 
 func (s *Selector[T]) Build() (*Query, error) {
 	var err error
-	s.model, err = s.db.r.Get(new(T))
+	s.model, err = s.r.Get(new(T))
 	if err != nil {
 		return nil, err
 	}
@@ -291,10 +290,8 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	db := s.db.db
 	// 在这里发起查询，并且处理结果集
-	rows, err := db.QueryContext(ctx, q.SQL, q.Args...)
+	rows, err := s.sess.queryContext(ctx, q.SQL, q.Args...)
 	// 这个是查询的错误
 	if err != nil {
 		return nil, err
@@ -307,7 +304,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	}
 
 	tp := new(T)
-	val := s.db.creator(s.model, tp)
+	val := s.creator(s.model, tp)
 	err = val.SetColumns(rows)
 	// 接口定义好后就两件事，一个是用新接口的方法改造上层，
 	// 一个就是提供不同的实现
@@ -321,9 +318,8 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	db := s.db.db
 	// 在这里发起查询，并且处理结果集
-	rows, err := db.QueryContext(ctx, q.SQL, q.Args...)
+	rows, err := s.sess.queryContext(ctx, q.SQL, q.Args...)
 	// 在这里继续处理结果集
 	for rows.Next() {
 		// 构造 []*T

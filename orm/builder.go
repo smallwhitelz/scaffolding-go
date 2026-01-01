@@ -2,16 +2,15 @@ package orm
 
 import (
 	"scaffolding-go/orm/internal/errs"
-	"scaffolding-go/orm/model"
 	"strings"
 )
 
 type builder struct {
-	sb      strings.Builder
-	args    []any
-	model   *model.Model
-	dialect Dialect
-	quoter  byte
+	core
+	sb   strings.Builder
+	args []any
+
+	quoter byte
 }
 
 func (b *builder) quote(name string) {
