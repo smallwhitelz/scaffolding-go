@@ -34,13 +34,15 @@ func NewSelector[T any](sess Session) *Selector[T] {
 }
 
 func (s *Selector[T]) Build() (*Query, error) {
-	var err error
-	s.model, err = s.r.Get(new(T))
-	if err != nil {
-		return nil, err
+	if s.model == nil {
+		var err error
+		s.model, err = s.r.Get(new(T))
+		if err != nil {
+			return nil, err
+		}
 	}
 	s.sb.WriteString("SELECT ")
-	if err = s.buildColumns(); err != nil {
+	if err := s.buildColumns(); err != nil {
 		return nil, err
 	}
 	s.sb.WriteString(" FROM ")
@@ -285,22 +287,56 @@ func (s *Selector[T]) Having(ps ...Predicate) *Selector[T] {
 //}
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
+	var err error
+	s.model, err = s.r.Get(new(T))
+	if err != nil {
+		return nil, err
+	}
+	root := s.getHandler
+	for i := len(s.mdls) - 1; i >= 0; i-- {
+		root = s.mdls[i](root)
+	}
+	res := root(ctx, &QueryContext{
+		Type:    "SELECT",
+		Builder: s,
+		Model:   s.model,
+	})
+	//var t *T
+	//if val, ok := res.Result.(*T); ok {
+	//	t = val
+	//}
+	//return t,res.Err
+	if res.Result != nil {
+		return res.Result.(*T), res.Err
+	}
+	return nil, res.Err
+}
+
+var _ Handler = (&Selector[any]{}).getHandler
+
+func (s *Selector[T]) getHandler(ctx context.Context, qc *QueryContext) *QueryResult {
 	q, err := s.Build()
 	// 这个是构造sql失败
 	if err != nil {
-		return nil, err
+		return &QueryResult{
+			Err: err,
+		}
 	}
 	// 在这里发起查询，并且处理结果集
 	rows, err := s.sess.queryContext(ctx, q.SQL, q.Args...)
 	// 这个是查询的错误
 	if err != nil {
-		return nil, err
+		return &QueryResult{
+			Err: err,
+		}
 	}
 	// 你要确认有没有数据
 	if !rows.Next() {
 		// 要不要返回error?
 		// 返回error 和 sql包语义保持一致
-		return nil, ErrNoRows
+		return &QueryResult{
+			Err: ErrNoRows,
+		}
 	}
 
 	tp := new(T)
@@ -308,7 +344,10 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	err = val.SetColumns(rows)
 	// 接口定义好后就两件事，一个是用新接口的方法改造上层，
 	// 一个就是提供不同的实现
-	return tp, err
+	return &QueryResult{
+		Result: tp,
+		Err:    err,
+	}
 
 }
 
