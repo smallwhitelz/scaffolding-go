@@ -52,14 +52,14 @@ func (s *Selector[T]) Build() (*Query, error) {
 		s.sb.WriteString(s.model.TableName)
 		s.sb.WriteByte('`')
 	} else {
-		//segs := strings.Split(s.table, ".")
-		//s.sb.WriteByte('`')
-		//s.sb.WriteString(segs[0])
-		//s.sb.WriteByte('`')
-		//s.sb.WriteByte('.')
-		//s.sb.WriteByte('`')
-		//s.sb.WriteString(segs[1])
-		//s.sb.WriteByte('`')
+		//segs := strings.Split(r.table, ".")
+		//r.sb.WriteByte('`')
+		//r.sb.WriteString(segs[0])
+		//r.sb.WriteByte('`')
+		//r.sb.WriteByte('.')
+		//r.sb.WriteByte('`')
+		//r.sb.WriteString(segs[1])
+		//r.sb.WriteByte('`')
 		s.sb.WriteString(s.table)
 	}
 	if len(s.where) > 0 {
@@ -205,9 +205,9 @@ func (s *Selector[T]) addArg(vals ...any) {
 }
 
 // 简单写法
-//func (s *Selector[T]) Select(cols ...string) *Selector[T] {
-//	s.columns = cols
-//	return s
+//func (r *Selector[T]) Select(cols ...string) *Selector[T] {
+//	r.columns = cols
+//	return r
 //}
 
 func (s *Selector[T]) Select(cols ...Selectable) *Selector[T] {
@@ -235,14 +235,14 @@ func (s *Selector[T]) Having(ps ...Predicate) *Selector[T] {
 	return s
 }
 
-//func (s *Selector[T]) GetV1(ctx context.Context) (*T, error) {
-//	q, err := s.Build()
+//func (r *Selector[T]) GetV1(ctx context.Context) (*T, error) {
+//	q, err := r.Build()
 //	// 这个是构造sql失败
 //	if err != nil {
 //		return nil, err
 //	}
 //
-//	db := s.db.db
+//	db := r.db.db
 //	// 在这里发起查询，并且处理结果集
 //	rows, err := db.QueryContext(ctx, q.SQL, q.Args...)
 //	// 这个是查询的错误
@@ -269,7 +269,7 @@ func (s *Selector[T]) Having(ps ...Predicate) *Selector[T] {
 //	address := reflect.ValueOf(tp).UnsafePointer()
 //	for _, c := range cs {
 //		// c 是列名
-//		fd, ok := s.model.ColumnMap[c]
+//		fd, ok := r.model.ColumnMap[c]
 //		if !ok {
 //			return nil, errs.NewErrUnknownColumn(c)
 //		}
@@ -292,64 +292,79 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	root := s.getHandler
-	for i := len(s.mdls) - 1; i >= 0; i-- {
-		root = s.mdls[i](root)
-	}
-	res := root(ctx, &QueryContext{
+	res := get[T](ctx, s.sess, s.core, &QueryContext{
 		Type:    "SELECT",
 		Builder: s,
 		Model:   s.model,
 	})
-	//var t *T
-	//if val, ok := res.Result.(*T); ok {
-	//	t = val
-	//}
-	//return t,res.Err
 	if res.Result != nil {
 		return res.Result.(*T), res.Err
 	}
 	return nil, res.Err
 }
 
-var _ Handler = (&Selector[any]{}).getHandler
+//func (r *Selector[T]) Get(ctx context.Context) (*T, error) {
+//	var err error
+//	r.model, err = r.r.Get(new(T))
+//	if err != nil {
+//		return nil, err
+//	}
+//	root := r.getHandler
+//	for i := len(r.mdls) - 1; i >= 0; i-- {
+//		root = r.mdls[i](root)
+//	}
+//	res := root(ctx, &QueryContext{
+//		Type:    "SELECT",
+//		Builder: r,
+//		Model:   r.model,
+//	})
+//	//var t *T
+//	//if val, ok := res.Result.(*T); ok {
+//	//	t = val
+//	//}
+//	//return t,res.Err
+//	if res.Result != nil {
+//		return res.Result.(*T), res.Err
+//	}
+//	return nil, res.Err
+//}
 
-func (s *Selector[T]) getHandler(ctx context.Context, qc *QueryContext) *QueryResult {
-	q, err := s.Build()
-	// 这个是构造sql失败
-	if err != nil {
-		return &QueryResult{
-			Err: err,
-		}
-	}
-	// 在这里发起查询，并且处理结果集
-	rows, err := s.sess.queryContext(ctx, q.SQL, q.Args...)
-	// 这个是查询的错误
-	if err != nil {
-		return &QueryResult{
-			Err: err,
-		}
-	}
-	// 你要确认有没有数据
-	if !rows.Next() {
-		// 要不要返回error?
-		// 返回error 和 sql包语义保持一致
-		return &QueryResult{
-			Err: ErrNoRows,
-		}
-	}
-
-	tp := new(T)
-	val := s.creator(s.model, tp)
-	err = val.SetColumns(rows)
-	// 接口定义好后就两件事，一个是用新接口的方法改造上层，
-	// 一个就是提供不同的实现
-	return &QueryResult{
-		Result: tp,
-		Err:    err,
-	}
-
-}
+//func getHandler[T any](ctx context.Context, sess Session, c core, qc *QueryContext) *QueryResult {
+//	q, err := qc.Builder.Build()
+//	// 这个是构造sql失败
+//	if err != nil {
+//		return &QueryResult{
+//			Err: err,
+//		}
+//	}
+//	// 在这里发起查询，并且处理结果集
+//	rows, err := sess.queryContext(ctx, q.SQL, q.Args...)
+//	// 这个是查询的错误
+//	if err != nil {
+//		return &QueryResult{
+//			Err: err,
+//		}
+//	}
+//	// 你要确认有没有数据
+//	if !rows.Next() {
+//		// 要不要返回error?
+//		// 返回error 和 sql包语义保持一致
+//		return &QueryResult{
+//			Err: ErrNoRows,
+//		}
+//	}
+//
+//	tp := new(T)
+//	val := c.creator(c.model, tp)
+//	err = val.SetColumns(rows)
+//	// 接口定义好后就两件事，一个是用新接口的方法改造上层，
+//	// 一个就是提供不同的实现
+//	return &QueryResult{
+//		Result: tp,
+//		Err:    err,
+//	}
+//
+//}
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 	q, err := s.Build()

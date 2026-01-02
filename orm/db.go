@@ -3,6 +3,9 @@ package orm
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"log"
 	"scaffolding-go/orm/internal/valuer"
 	"scaffolding-go/orm/model"
 )
@@ -113,4 +116,13 @@ func (db *DB) execContext(ctx context.Context, query string, args ...any) (sql.R
 
 func (db *DB) getCore() core {
 	return db.core
+}
+
+func (db *DB) Wait() error {
+	err := db.db.Ping()
+	for errors.Is(err, driver.ErrBadConn) {
+		log.Println("数据库启动中")
+		err = db.db.Ping()
+	}
+	return nil
 }

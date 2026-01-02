@@ -68,7 +68,7 @@ func (r reflectValue) SetColumns(rows *sql.Rows) error {
 		if !ok {
 			return errs.NewErrUnknownColumn(c)
 		}
-		tpValue.Elem().FieldByName(fd.GoName).Set(valElems[i])
+		tpValue.FieldByName(fd.GoName).Set(valElems[i])
 	}
 	return err
 }

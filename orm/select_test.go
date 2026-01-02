@@ -376,7 +376,7 @@ func TestSelector_Get(t *testing.T) {
 		},
 		//{
 		//	name:    "scan error",
-		//	s:       NewSelector[TestModel](db).Where(C("Id").Eq(1)),
+		//	r:       NewSelector[TestModel](db).Where(C("Id").Eq(1)),
 		//	wantErr: ErrNoRows,
 		//},
 	}

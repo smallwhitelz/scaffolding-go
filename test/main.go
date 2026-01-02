@@ -1,6 +1,8 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func scan(vals ...any) {
 	for i, val := range vals {
