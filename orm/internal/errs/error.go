@@ -57,3 +57,7 @@ func NewErrFailedToRollbackTx(bizErr error, rbErr error, panicked bool) error {
 	// return fmt.Errorf("orm: 事务闭包回滚失败，业务错误: %s，回滚错误 %w，" +
 	// 	"是否 panic: %t", bizErr, rbErr, panicked)
 }
+
+func NewErrUnsupportedTable(table any) error {
+	return fmt.Errorf("orm: 不支持的TableReference类型 %v", table)
+}

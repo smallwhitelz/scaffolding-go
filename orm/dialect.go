@@ -84,7 +84,7 @@ func (s sqliteDialect) buildUpsert(b *builder, upsert *Upsert) error {
 		if i > 0 {
 			b.sb.WriteByte(',')
 		}
-		err := b.buildColumn(col)
+		err := b.buildColumn(Column{name: col})
 		if err != nil {
 			return err
 		}
