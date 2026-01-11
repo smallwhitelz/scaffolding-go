@@ -76,3 +76,15 @@ func TestNewBuildInMapCache_Loop(t *testing.T) {
 	require.False(t, ok)
 	require.Equal(t, 1, cnt)
 }
+
+// Write Back
+// 在写操作的时候写了缓存直接返回，不会直接更新数据 库，读也是直接读缓存
+// 在缓存过期的时候，将缓存写回去数据库
+// 优缺点：
+// 所有 goroutine 都是读写缓存，不存在一致性的问题（如果是本地缓存依旧会有问题）
+// 数据可能丢失：如果在缓存过期刷新到数据库之前，缓存宕机，那么会丢失数据
+func TestNewBuildInMapCache_WriteBack(t *testing.T) {
+	NewBuildInMapCache(time.Second, BuildInMapCacheOptionWithEvictedCallBack(func(key string, val any) {
+		// 刷新到数据库
+	}))
+}

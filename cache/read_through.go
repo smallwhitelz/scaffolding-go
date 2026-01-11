@@ -9,6 +9,9 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
+// read_through业务代码只需要从 cache 中读取数据，cache 会在缓存不命中的时候去读取数据
+// 写数据的时候，业务代码需要自己写 DB 和写 cache
+
 var (
 	ErrFailedToRefreshCache = errors.New("刷新缓存失败")
 )
