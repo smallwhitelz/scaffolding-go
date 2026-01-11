@@ -22,7 +22,7 @@ type ReadThroughCache struct {
 	Cache
 	LoadFunc   func(ctx context.Context, key string) (any, error)
 	Expiration time.Duration
-	sg         singleflight.Group
+	//sg         singleflight.Group
 }
 
 func (r *ReadThroughCache) Get(ctx context.Context, key string) (any, error) {
@@ -73,23 +73,23 @@ func (r *ReadThroughCache) GetV2(ctx context.Context, key string) (any, error) {
 	return val, err
 }
 
-// GetV3
-func (r *ReadThroughCache) GetV3(ctx context.Context, key string) (any, error) {
-	val, err := r.Cache.Get(ctx, key)
-	if err == errKeyNotFound {
-		val, err, _ = r.sg.Do(key, func() (interface{}, error) {
-			v, er := r.LoadFunc(ctx, key)
-			if er == nil {
-				er = r.Cache.Set(ctx, key, val, r.Expiration)
-				if er != nil {
-					log.Fatalln(er)
-				}
-			}
-			return v, er
-		})
-	}
-	return val, err
-}
+// GetV3 侵入式写法
+//func (r *ReadThroughCache) GetV3(ctx context.Context, key string) (any, error) {
+//	val, err := r.Cache.Get(ctx, key)
+//	if err == errKeyNotFound {
+//		val, err, _ = r.sg.Do(key, func() (interface{}, error) {
+//			v, er := r.LoadFunc(ctx, key)
+//			if er == nil {
+//				er = r.Cache.Set(ctx, key, val, r.Expiration)
+//				if er != nil {
+//					log.Fatalln(er)
+//				}
+//			}
+//			return v, er
+//		})
+//	}
+//	return val, err
+//}
 
 type ReadThroughCacheV1[T any] struct {
 	Cache
